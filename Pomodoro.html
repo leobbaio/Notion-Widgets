@@ -1,0 +1,445 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pomodoro</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+  :root {
+    --bg-outer: #191919;
+    --bg-widget: #202020;
+    --text-default: #D4D4D4;
+    --text-secondary: #9B9B9B;
+    --text-muted: #6B6B6B;
+    --border-color: rgba(255, 255, 255, 0.08);
+    --hover-bg: rgba(255, 255, 255, 0.055);
+    --active-bg: rgba(255, 255, 255, 0.09);
+    --txt-color: #D4D4D4;
+    --alert-bg: #BE524B;
+    --font-stack: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+
+  html, body { height: 100%; width: 100%; overflow: hidden; background: var(--bg-outer); font-family: var(--font-stack); }
+
+  .widget-stage { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background: var(--bg-outer); overflow: hidden; }
+
+  .pomodoro-widget {
+    width: 280px; height: 200px;
+    background: var(--bg-outer);
+    border: none;
+    box-shadow: none;
+    display: flex; flex-direction: column;
+    color: var(--text-default);
+    flex-shrink: 0;
+    transform-origin: center center;
+    position: relative;
+    transition: background 0.3s ease;
+  }
+
+  /* estado de alerta — fundo vermelho */
+  .pomodoro-widget.alert { background: var(--alert-bg); }
+
+  .widget-header { display: flex; align-items: center; justify-content: flex-end; gap: 2px; padding: 10px 10px 0 10px; flex-shrink: 0; }
+
+  .icon-btn {
+    width: 24px; height: 24px;
+    display: flex; align-items: center; justify-content: center;
+    background: transparent; border: none; border-radius: 4px;
+    color: var(--txt-color); cursor: pointer;
+    transition: background 0.1s ease, color 0.1s ease;
+  }
+  .icon-btn:hover { background: var(--hover-bg); }
+  .icon-btn:active { background: var(--active-bg); }
+  .icon-btn svg { width: 14px; height: 14px; display: block; pointer-events: none; }
+
+  .pomodoro-body {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    padding: 0 12px 12px 12px;
+    margin-top: -6px;
+  }
+
+  .time {
+    font-size: 50px;
+    font-weight: 700;
+    color: var(--txt-color);
+    letter-spacing: 1px;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.3s ease;
+  }
+
+  .pomodoro-widget.alert .time { color: #FFFFFF; }
+
+  .alert-msg {
+    font-size: 13px;
+    font-weight: 500;
+    color: #FFFFFF;
+    margin-top: 8px;
+    height: 16px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+  .pomodoro-widget.alert .alert-msg { opacity: 1; }
+
+  /* controles centrais */
+  .controls {
+    display: flex; align-items: center; justify-content: center; gap: 10px;
+    margin-top: 14px;
+  }
+
+  .ctrl-btn {
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color); border-radius: 8px;
+    color: var(--txt-color); cursor: pointer;
+    transition: background 0.1s ease, border-color 0.1s ease;
+  }
+  .ctrl-btn:hover { background: var(--hover-bg); border-color: rgba(255,255,255,0.16); }
+  .ctrl-btn:active { background: var(--active-bg); }
+  .ctrl-btn svg { width: 16px; height: 16px; display: block; pointer-events: none; }
+
+  .pomodoro-widget.alert .ctrl-btn {
+    background: rgba(255,255,255,0.15);
+    border-color: rgba(255,255,255,0.3);
+    color: #FFFFFF;
+  }
+
+  .dropdown {
+    position: absolute; z-index: 20;
+    background: #2A2A2A;
+    border: 1px solid var(--border-color); border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+    padding: 8px 6px; display: none;
+  }
+  .dropdown.open { display: block; }
+
+  #timeMenu { top: 38px; right: 10px; width: 172px; }
+  .menu-label { font-size: 11px; color: var(--text-secondary); padding: 2px 4px 6px 4px; }
+  .menu-input-row { display: flex; gap: 6px; }
+  .menu-input {
+    flex: 1; min-width: 0; width: 90px; height: 30px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid var(--border-color); border-radius: 6px;
+    color: var(--text-default); font-family: var(--font-stack); font-size: 13px; text-align: center; outline: none;
+  }
+  .menu-input:focus { border-color: rgba(255,255,255,0.2); }
+  .menu-input::-webkit-outer-spin-button, .menu-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  .menu-input[type=number] { -moz-appearance: textfield; }
+  .menu-save {
+    height: 30px; padding: 0 10px; flex-shrink: 0;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border-color); border-radius: 6px;
+    color: var(--text-default); cursor: pointer;
+    font-family: var(--font-stack); font-size: 12px;
+  }
+  .menu-save:hover { background: var(--hover-bg); }
+
+  #colorMenu { top: 38px; right: 10px; width: 176px; }
+  .menu-section-label { font-size: 11px; color: var(--text-muted); padding: 4px 8px 6px 8px; font-weight: 500; }
+  .swatch-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; padding: 0 4px 4px 4px; }
+  .swatch-cell {
+    width: 28px; height: 28px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 5px; cursor: pointer;
+    border: 1px solid var(--border-color);
+    font-size: 14px; font-weight: 600;
+    transition: transform 0.08s ease, border-color 0.1s ease;
+  }
+  .swatch-cell:hover { border-color: rgba(255, 255, 255, 0.35); transform: scale(1.06); }
+  .swatch-cell.selected { border-color: var(--text-default); border-width: 2px; }
+
+  #errbar {
+    position: fixed; left: 0; right: 0; bottom: 0;
+    background: #BE524B; color: #fff;
+    font-family: monospace; font-size: 11px;
+    padding: 4px 8px; display: none; z-index: 999;
+    white-space: pre-wrap; word-break: break-word;
+  }
+</style>
+</head>
+<body>
+
+  <div class="widget-stage" id="stage">
+    <div class="pomodoro-widget" id="widget">
+
+      <div class="widget-header">
+        <button class="icon-btn" id="timeBtn" type="button" aria-label="Definir tempo">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="9"></circle>
+            <circle cx="12" cy="12" r="4.5"></circle>
+          </svg>
+        </button>
+        <button class="icon-btn" id="colorBtn" type="button" aria-label="Cor">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 2.5s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"></path>
+          </svg>
+        </button>
+      </div>
+
+      <div class="dropdown" id="timeMenu">
+        <div class="menu-label">Tempo (minutos)</div>
+        <div class="menu-input-row">
+          <input type="number" class="menu-input" id="timeInput" min="1" max="180" step="1">
+          <button class="menu-save" id="timeSave" type="button">OK</button>
+        </div>
+      </div>
+
+      <div class="dropdown" id="colorMenu">
+        <div class="menu-section-label">Text color</div>
+        <div class="swatch-grid" id="textGrid"></div>
+      </div>
+
+      <div class="pomodoro-body">
+        <div class="time" id="time">25:00</div>
+        <div class="alert-msg" id="alertMsg"></div>
+
+        <div class="controls">
+          <button class="ctrl-btn" id="resetBtn" type="button" aria-label="Reiniciar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 1 0 3-6.7L3 8"></path>
+              <path d="M3 3v5h5"></path>
+            </svg>
+          </button>
+          <button class="ctrl-btn" id="playPauseBtn" type="button" aria-label="Iniciar/Pausar">
+            <svg id="ppIcon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7z"></path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="errbar"></div>
+
+<script>
+window.addEventListener("DOMContentLoaded", function () {
+  try {
+    "use strict";
+
+    var DEFAULT_TXT = "#D4D4D4";
+    var DEFAULT_MIN = 25;
+
+    var TEXT_COLORS = [
+      { name: "Default", value: "#D4D4D4" }, { name: "Gray", value: "#9B9B9B" },
+      { name: "Brown", value: "#A27763" }, { name: "Orange", value: "#CB7B37" },
+      { name: "Yellow", value: "#C19138" }, { name: "Green", value: "#4F9768" },
+      { name: "Blue", value: "#447ACB" }, { name: "Purple", value: "#865DBB" },
+      { name: "Pink", value: "#BA4A78" }, { name: "Red", value: "#BE524B" }
+    ];
+
+    var mem = {};
+    function store(key, val) {
+      if (val === undefined) {
+        try { var v = localStorage.getItem(key); return v !== null ? v : (key in mem ? mem[key] : null); }
+        catch (e) { return key in mem ? mem[key] : null; }
+      } else {
+        try { localStorage.setItem(key, val); } catch (e) { mem[key] = val; }
+      }
+    }
+
+    var txtColor = store("pomo_txt") || DEFAULT_TXT;
+    var totalMin = parseInt(store("pomo_min"), 10);
+    if (!isFinite(totalMin) || totalMin <= 0) totalMin = DEFAULT_MIN;
+
+    var remaining = totalMin * 60;   // segundos restantes
+    var running = false;
+    var finished = false;
+    var intervalId = null;
+
+    var widget = document.getElementById("widget");
+    var timeEl = document.getElementById("time");
+    var ppIcon = document.getElementById("ppIcon");
+    var resetBtn = document.getElementById("resetBtn");
+    var playPauseBtn = document.getElementById("playPauseBtn");
+
+    var timeBtn = document.getElementById("timeBtn");
+    var timeMenu = document.getElementById("timeMenu");
+    var timeInput = document.getElementById("timeInput");
+    var timeSave = document.getElementById("timeSave");
+
+    var colorBtn = document.getElementById("colorBtn");
+    var colorMenu = document.getElementById("colorMenu");
+    var textGrid = document.getElementById("textGrid");
+
+    var PLAY = '<path d="M8 5v14l11-7z"></path>';
+    var PAUSE = '<path d="M6 5h4v14H6zM14 5h4v14h-4z"></path>';
+
+    function pad(n) { return n < 10 ? "0" + n : String(n); }
+
+    function fmt(totalSeconds) {
+      var m = Math.floor(totalSeconds / 60);
+      var s = totalSeconds % 60;
+      return pad(m) + ":" + pad(s);
+    }
+
+    function renderTime() { timeEl.textContent = fmt(remaining); }
+
+    function applyColor() { document.documentElement.style.setProperty("--txt-color", txtColor); }
+
+    /* ===== Áudio: 3 bipes sequenciais via Web Audio ===== */
+    var audioCtx = null;
+    function ensureAudio() {
+      try {
+        if (!audioCtx) {
+          var AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) audioCtx = new AC();
+        }
+        if (audioCtx && audioCtx.state === "suspended") audioCtx.resume();
+      } catch (e) {}
+    }
+    function beep(startTime, freq) {
+      if (!audioCtx) return;
+      var osc = audioCtx.createOscillator();
+      var gain = audioCtx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq || 880;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.35, startTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.22);
+      osc.start(startTime);
+      osc.stop(startTime + 0.24);
+    }
+    function playThreeBeeps() {
+      if (!audioCtx) return;
+      var t = audioCtx.currentTime;
+      beep(t + 0.00, 880);
+      beep(t + 0.30, 880);
+      beep(t + 0.60, 880);
+    }
+
+    /* ===== Controle do timer ===== */
+    function tick() {
+      if (remaining > 0) {
+        remaining--;
+        renderTime();
+        if (remaining <= 0) { onFinish(); }
+      }
+    }
+
+    function start() {
+      if (finished) return;
+      if (running) return;
+      ensureAudio();
+      running = true;
+      ppIcon.innerHTML = PAUSE;
+      intervalId = setInterval(tick, 1000);
+    }
+
+    function pause() {
+      running = false;
+      ppIcon.innerHTML = PLAY;
+      if (intervalId) { clearInterval(intervalId); intervalId = null; }
+    }
+
+    function reset() {
+      pause();
+      finished = false;
+      widget.classList.remove("alert");
+      remaining = totalMin * 60;
+      renderTime();
+    }
+
+    function onFinish() {
+      running = false;
+      finished = true;
+      if (intervalId) { clearInterval(intervalId); intervalId = null; }
+      ppIcon.innerHTML = PLAY;
+      widget.classList.add("alert");
+      playThreeBeeps();
+    }
+
+    playPauseBtn.addEventListener("click", function () {
+      ensureAudio();
+      if (finished) return;         // no estado final, só reset volta
+      if (running) { pause(); } else { start(); }
+    });
+
+    resetBtn.addEventListener("click", function () { reset(); });
+
+    /* ===== Menu de tempo ===== */
+    function closeTime() { timeMenu.classList.remove("open"); }
+    function closeColor() { colorMenu.classList.remove("open"); }
+
+    timeBtn.addEventListener("click", function (e) {
+      e.stopPropagation(); closeColor();
+      var open = !timeMenu.classList.contains("open");
+      timeMenu.classList.toggle("open", open);
+      if (open) { timeInput.value = totalMin; timeInput.focus(); timeInput.select(); }
+    });
+    timeSave.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var v = parseInt(timeInput.value, 10);
+      if (isFinite(v) && v > 0) {
+        totalMin = v;
+        store("pomo_min", String(totalMin));
+        reset();
+      }
+      closeTime();
+    });
+    timeInput.addEventListener("keydown", function (e) { if (e.key === "Enter") timeSave.click(); });
+    timeMenu.addEventListener("click", function (e) { e.stopPropagation(); });
+
+    /* ===== Menu de cor ===== */
+    TEXT_COLORS.forEach(function (col) {
+      var cell = document.createElement("div");
+      cell.className = "swatch-cell";
+      cell.style.color = col.value;
+      cell.textContent = "A";
+      cell.title = col.name;
+      cell.setAttribute("data-value", col.value);
+      cell.addEventListener("click", function (e) {
+        e.stopPropagation();
+        txtColor = col.value;
+        store("pomo_txt", txtColor);
+        applyColor(); mark();
+      });
+      textGrid.appendChild(cell);
+    });
+    function mark() {
+      var cells = textGrid.children;
+      for (var i = 0; i < cells.length; i++) {
+        cells[i].classList.toggle("selected", cells[i].getAttribute("data-value") === txtColor);
+      }
+    }
+    colorBtn.addEventListener("click", function (e) {
+      e.stopPropagation(); closeTime();
+      var open = !colorMenu.classList.contains("open");
+      colorMenu.classList.toggle("open", open);
+      if (open) mark();
+    });
+    colorMenu.addEventListener("click", function (e) { e.stopPropagation(); });
+
+    document.addEventListener("click", function () { closeTime(); closeColor(); });
+
+    /* ===== Escala ===== */
+    var stage = document.getElementById("stage");
+    function fit() {
+      var s = Math.min(stage.clientWidth / 280, stage.clientHeight / 200);
+      if (!isFinite(s) || s <= 0) s = 1;
+      widget.style.transform = "scale(" + s + ")";
+    }
+    window.addEventListener("resize", fit);
+    if (window.ResizeObserver) { new ResizeObserver(fit).observe(stage); }
+
+    applyColor();
+    renderTime();
+    fit();
+
+  } catch (err) {
+    var bar = document.getElementById("errbar");
+    if (bar) { bar.style.display = "block"; bar.textContent = "Erro: " + (err && err.message ? err.message : err); }
+  }
+});
+</script>
+
+</body>
+</html>
